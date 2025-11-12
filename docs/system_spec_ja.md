@@ -78,21 +78,13 @@ flowchart LR
 
 ## 5. 機能仕様
 ### 5.1 フロントエンド（主要コンポーネント）
-- **Auth Gate**：Supabase Auth UI をラップし、JWT を取得。React Query で認証状態を管理。
-- **TIPI Form (`OnboardingPage`)**  
-  - API: `POST /functions/v1/tipi`  
-  - Payload: `{ answers: Record<id, 1-7> }`  
-  - Response: `{ scores: BigFiveScores }`  
-  - 保存完了後、結果画面を表示し `/app/home` へ遷移。
-- **Home**  
-  - API: `GET /functions/v1/messages/today`  
-  - レスポンスが `status: generating` ならローディングを表示、`completed` なら本文と評価 UI を出す。
-- **CheckinModal**  
-  - API: `POST /functions/v1/checkins`  
-  - サーバーが 202 を返したらローディング状態に切り替え、`GET /functions/v1/messages/latest?checkin_id=` で 5 秒間隔のポーリング。
-- **History**  
-  - API: `GET /functions/v1/history?limit=20&cursor=...`  
-  - メッセージ詳細で `PATCH /functions/v1/messages/{id}` を呼び、`feedback_score` を更新。
+| コンポーネント | 主な API / 挙動 |
+| --- | --- |
+| Auth Gate | Supabase Auth UI をラップし JWT を取得。React Query で認証状態をキャッシュ。 |
+| TIPI Form (`OnboardingPage`) | `POST /functions/v1/tipi` に `{ answers: Record<id,1-7> }` を送信。レスポンス `{ scores: BigFiveScores }` を表示して `/app/home` へ遷移。 |
+| Home | `GET /functions/v1/messages/today` を呼び、`status: generating` ならローディング、`completed` なら本文と評価 UI を表示。 |
+| CheckinModal | `POST /functions/v1/checkins` を送信し HTTP 202 を受領後、`GET /functions/v1/messages/latest?checkin_id=` を 5 秒間隔でポーリング。 |
+| History | `GET /functions/v1/history?limit=20&cursor=...` で一覧取得。詳細で `PATCH /functions/v1/messages/{id}` を呼び `feedback_score` を更新。 |
 
 ### 5.2 Edge Functions
 | 関数 | 説明 |
@@ -127,9 +119,12 @@ flowchart LR
 
 RLS（Row Level Security）で `user_id = auth.uid()` の行のみ CRUD 可とする。
 
-- **Supabase**：Auth、PostgreSQL、Edge Functions、Storage（将来のメディア用途）。
-- **Google Cloud**：Cloud Run（UI）、Secret Manager（API キー）、選定した LLM API への接続、Cloud Scheduler（定期 Worker 起動）、Slack Webhook（運用通知）。
-- **npm 依存**：React 19, React Router 7, React Query, Supabase JS, Tailwind（CDN）, Recharts, Vite 6。
+## 7. 外部サービス & 依存関係
+| 種別 | 内容 |
+| --- | --- |
+| Supabase | Auth、PostgreSQL、Edge Functions、Storage（将来のメディア用途）。 |
+| Google Cloud | Cloud Run（UI）、Secret Manager（API キー）、選定した LLM API への接続、Cloud Scheduler（定期 Worker 起動）、Slack Webhook（運用通知）。 |
+| npm 依存 | React 19, React Router 7, React Query, Supabase JS, Tailwind（CDN）, Recharts, Vite 6。 |
 
 ## 8. 非機能要件
 | 項目 | 要件 |
