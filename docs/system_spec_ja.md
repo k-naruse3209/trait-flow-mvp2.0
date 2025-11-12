@@ -1,20 +1,15 @@
-# Trait Flow v2.0 実運用仕様書
+# Trait Flow v2.0 プロトタイプ仕様書
 
 ## 0. 背景
-- 既存の AI Studio UI（React/Vite）をベースに、実際にユーザーの回答を保存・分析しながら AI からのフィードバックを生成できる **プロダクション対応構成** へ拡張する。
-- 目標は「Big Five × 日次チェックイン × AI 介入」を **最小限の SLO（レスポンス ≤5 秒、成功率 ≥97%）で提供**し、5〜10 名のクローズドパイロットを安定運用できるようにすること。
-- 基盤には Supabase（Auth + PostgreSQL + Edge Functions）を用い、Gemini 1.5 Flash を介入生成に採用する。Cloud Run 上でフロントエンドをホストし、Edge Functions を API ゲートウェイとして扱う。
+- 既存の AI Studio UI（React/Vite）をベースに、ユーザーの回答を保存・分析しながら AI からのフィードバックが動的に変化する **プロトタイプ** を短期間で成立させる。
+- 目標は「Big Five × 日次チェックイン × AI 介入」の一連フローを実ユーザーデータで動かし、運用手順と拡張余地を確認すること（SLO の目安はレスポンス ≤5 秒、成功率 ≥97%）。
+- 基盤には Supabase（Auth + PostgreSQL + Edge Functions）を用い、フロントエンドは Cloud Run 上でホストする。介入生成に利用する LLM API はエンジニアが選定し、Structured Output/Moderation/フォールバックを実装可能なものを採用する。
 
-## 1. 検証仮説 & 成功指標
-- **仮説**
-  1. ユーザー固有の Big Five プロファイルと直近チェックインを組み合わせた Gemini 生成メッセージは、汎用テンプレートより 20%以上「役に立つ」評価を得る。
-  2. 1 回 1 分以内のチェックイン体験と即時フィードバックが、2 週間で 60% 以上の日次継続率を生む。
-  3. Supabase + Edge Functions + Google Cloud Run の構成で、端末 3G 回線でも 5 秒以内にフィードバックを表示できる。
-- **成功指標（2 週間）**
-  - オンボーディング完了率 ≥ 85%（TIPI 全 10 問回答）。
-  - 日次チェックイン継続率 ≥ 60%（登録ユーザーの 60% が 4 回以上投稿）。
-  - メッセージの 5 段階評価で 4 以上の割合 ≥ 65%。
-  - Gemini 呼び出し成功率 ≥ 97%、レスポンス中央値 < 4 秒。
+## 1. プロトタイプ方針
+- 検証仮説や成功指標は本仕様では扱わず、**ユーザー回答→処理→AI 応答が変化すること**を一貫したフローとして成立させることに専念する。
+- 実データを Supabase に追記保存し、後から分析・リプレイできる構造を必須とする。
+- LLM API の選定・チューニングはエンジニアに委任する（要件: Structured Output/Moderation/監査ログ/フォールバックを実装可能、SLA やコストは運用判断）。
+- 将来的なプロダクション展開を見据えているが、プロトタイプ段階ではオペレーター監視・小規模ユーザー（5〜10 名）での安定動作に集中する。
 
 ## 2. スコープ
 ### 今回実装するもの
@@ -22,7 +17,7 @@
 | --- | --- |
 | フロント | 既存 React UI を日本語のまま利用。Auth/Auth 状態管理、API 呼び出し、リアルデータ表示のための改修を追加。 |
 | バックエンド | Supabase Auth, PostgreSQL スキーマ、Edge Functions 3 本（TIPI登録、チェックイン作成、介入生成）。 |
-| AI サービス | Gemini 1.5 Flash API（REST）。Structured Output で `{title, body, tone}` を取得。 |
+| AI サービス | エンジニアが選定する LLM API（REST/Responses 互換）。Structured Output で `{title, body, tone}` を取得できること。 |
 | 運用 | Cloud Run デプロイ、Supabase モニタリング、Slack 通知（失敗時）。 |
 
 ### スコープ外
@@ -32,13 +27,13 @@
 1. **アクセス & 認証**  
    Cloud Run 上の UI へアクセス → Supabase Auth（メールリンク）でログイン。
 2. **TIPI オンボーディング**  
-   10 問回答 → `baseline_traits` へ保存 → Gemini なしの簡易スコア結果を即時表示。
+   10 問回答 → `baseline_traits` へ保存 → LLM 呼び出しなしの簡易スコア結果を即時表示。
 3. **ホーム**  
    API から当日のメッセージを取得。未読なら「チェックインしてメッセージを受け取る」を促す。
 4. **チェックイン**  
    気分/エネルギー/メモを入力 → `/functions/v1/checkins` へ送信 → DB 保存後、キュー `intervention_jobs` にメッセージ生成を投入。
 5. **AI メッセージ生成**  
-   Edge Function Worker がジョブを処理し Gemini を呼び出し → `interventions` に保存 → フロントは SSE/ポーリングで結果取得。
+   Edge Function Worker がジョブを処理し 選定した LLM API を呼び出し → `interventions` に保存 → フロントは SSE/ポーリングで結果取得。
 6. **履歴 & フィードバック**  
    メッセージカードを開き評価（1〜5）を送信 → `feedback_score` 更新。
 
@@ -65,7 +60,7 @@ flowchart LR
   end
 
   subgraph Google["Google Cloud"]
-    Gemini[Gemini 1.5 Flash API]
+    LLM[LLM API (engineer-selected)]
     Slack[Slack Webhook]
   end
 
@@ -76,7 +71,7 @@ flowchart LR
   funcCheckin --> Queue
   funcWorker --> Queue
   funcWorker --> DB
-  funcWorker --> Gemini
+  funcWorker --> LLM
   funcWorker --> Slack
   funcPoll --> DB
 ```
@@ -105,16 +100,20 @@ flowchart LR
 | `saveTipi` | TIPI 回答を受け取り、Big Five スコアを算出して `baseline_traits` に UPSERT。 |
 | `createCheckin` | チェックインを `checkins` に保存、`intervention_jobs` にジョブを enqueue、HTTP 202 を返す。 |
 | `fetchMessages` | 今日のメッセージ / 履歴 / 評価更新を扱う REST エンドポイント集合。 |
-| `processIntervention` | キューからジョブ取得 → Gemini 呼び出し → `interventions` へ保存 → Slack へ失敗通知。 |
+| `processIntervention` | キューからジョブ取得 → 選定した LLM API を呼び出し → `interventions` へ保存 → Slack へ失敗通知。 |
 
-### 5.3 Gemini 呼び出し仕様
-- **モデル**: `gemini-1.5-flash`  
+### 5.3 LLM 呼び出し仕様
+- **モデル選定**: エンジニアがレスポンス速度・コスト・日本語出力品質に基づき選択（例: Gemini 1.5 Flash, OpenAI Responses, Claude Haiku など）。  
+- **必須要件**:  
+  - Structured Output で `{title, body, tone}` を返せる（JSON Schema or function call）。  
+  - Moderation/安全制御 API、もしくは同等のコンテンツフィルタを適用できる。  
+  - 4 秒以内に応答できるレイテンシ特性（プロトタイプ目安）。  
 - **入力**:  
   - 上位/下位各 1 特性（数値）  
   - 直近 3 回の気分平均、最新チェックイン詳細  
   - ユーザーの週次目標（任意フィールド）  
-- **プロンプトテンプレート**: JSON 形式で `title`（20 文字）、`body`（200 文字以内）、`tone`（`reflective | actionable | compassionate`）。  
-- **タイムアウト**: 4 秒。失敗時はテンプレート文を使用し `interventions.use_fallback = true`。
+- **アウトプット要件**: `title`（20 文字）、`body`（200 文字以内）、`tone`（`reflective | actionable | compassionate`）。  
+- **フォールバック**: タイムアウト/エラー時はテンプレート文を使用し `interventions.use_fallback = true`。LLM 切替・再試行ポリシーは I モジュール（信頼性）で管理する。
 
 ## 6. データモデル
 | テーブル | 主な列 |
@@ -128,9 +127,8 @@ flowchart LR
 
 RLS（Row Level Security）で `user_id = auth.uid()` の行のみ CRUD 可とする。
 
-## 7. 外部サービス & 依存関係
 - **Supabase**：Auth、PostgreSQL、Edge Functions、Storage（将来のメディア用途）。
-- **Google Cloud**：Cloud Run（UI）、Secret Manager（API キー）、Gemini API、Cloud Scheduler（定期 Worker 起動）、Slack Webhook（運用通知）。
+- **Google Cloud**：Cloud Run（UI）、Secret Manager（API キー）、選定した LLM API への接続、Cloud Scheduler（定期 Worker 起動）、Slack Webhook（運用通知）。
 - **npm 依存**：React 19, React Router 7, React Query, Supabase JS, Tailwind（CDN）, Recharts, Vite 6。
 
 ## 8. 非機能要件
@@ -138,8 +136,8 @@ RLS（Row Level Security）で `user_id = auth.uid()` の行のみ CRUD 可と�
 | --- | --- |
 | レイテンシ | チェックイン送信からメッセージ表示まで平均 4 秒以内、p95 7 秒以内。 |
 | 可用性 | UI/Edge Functions の稼働率 99%（Cloud Run / Supabase SLA）。 |
-| 監視 | Supabase Logs + Cloud Logging。失敗時 Slack 通知。Gemini 使用量を日次エクスポート。 |
-| セキュリティ | Supabase Auth + HTTPS。Edge Functions には JWT 必須。Gemini / Slack キーは Secret Manager 管理。 |
+| 監視 | Supabase Logs + Cloud Logging。失敗時 Slack 通知。LLM API 使用量を日次エクスポート。 |
+| セキュリティ | Supabase Auth + HTTPS。Edge Functions には JWT 必須。LLM / Slack キーは Secret Manager 管理。 |
 | バックアップ | DB は Supabase PITR を有効化。`interventions` は 90 日でアーカイブ。 |
 
 ## 9. オペレーション
@@ -148,7 +146,7 @@ RLS（Row Level Security）で `user_id = auth.uid()` の行のみ CRUD 可と�
    - Edge Functions は `supabase functions deploy`。  
 2. **ランブック**  
    - Edge Function 5xx 増加 → Slack アラート → Cloud Logging で原因特定 → 必要ならキューを手動リプレイ。  
-   - Gemini 限度超過 → Secret Manager でキー切替 or プラン変更。  
+   - LLM API の使用量制限に到達 → Secret Manager でキー切替 or プラン変更。  
 3. **サポート**  
    - パイロット参加者用に Slack/LINE グループを用意し、障害時は即時連絡。  
 
@@ -156,14 +154,14 @@ RLS（Row Level Security）で `user_id = auth.uid()` の行のみ CRUD 可と�
 1. Week1: Supabase プロジェクト初期化、Auth/Fn/DB スキーマ設計。
 2. Week2: TIPI API とホーム画面のデータ取得を実装、CI/CD 整備。
 3. Week3: チェックイン API + intervention_jobs → processIntervention Worker。
-4. Week4: Gemini 連携、エラーハンドリング、Slack 通知。
+4. Week4: LLM API 連携、エラーハンドリング、Slack 通知。
 5. Week5: QA（iOS/Android）・ロギング・観測性強化・小規模ドッグフーディング。
 6. Week6: パイロットローンチ、週次で KPI/Feedback をレビュー。
 
 ## 11. リスクと対策
 | リスク | 対策 |
 | --- | --- |
-| Gemini API 遅延 | タイムアウト＆テンプレート fallback、Queue 再試行（最大 3 回）。 |
+| LLM API 遅延/失敗 | タイムアウト＆テンプレート fallback、Queue 再試行（最大 3 回）、必要に応じて代替モデルへフェイルオーバー。 |
 | Supabase 障害 | Cloud Run 停止＆Slack 通知。緊急時はローカルテンプレートでオフラインモードを提供。 |
 | 個人情報保護 | 取得 PII をメールアドレスのみに限定。利用規約・プライポリを公開。 |
 | モバイル UX 破綻 | Storybook / Percy でビジュアルリグレッションテスト、主要端末で QA。 |
@@ -172,5 +170,5 @@ RLS（Row Level Security）で `user_id = auth.uid()` の行のみ CRUD 可と�
 - 旧仕様: `trait-flow-mvp/docs/prototype_spec_ja.md`
 - `trait-flow-mvp2.0/App.tsx`（UI 実装）
 - Supabase Edge Functions & Auth ドキュメント
-- Google Gemini API ドキュメント
+- LLM API ドキュメント（例: Google Gemini API）
 - Cloud Run / Cloud Build / Secret Manager ベストプラクティス
