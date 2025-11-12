@@ -2,11 +2,9 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# AI Studio アプリの実行とデプロイ
+# Trait Flow v2.0 プロトタイプ — 実行とデプロイ
 
-このリポジトリには、AI Studio で作成したアプリをローカルで動かしたり、本番環境にデプロイしたりするためのファイルが一式そろっています。
-
-AI Studio 上でアプリを確認する: https://ai.studio/apps/drive/1HDEDL9GTki0WyE3JGkHue6dTsWu7HsDI
+このリポジトリは Trait Flow v2.0 の Web UI プロトタイプを含みます。ユーザーの TIPI 回答や日次チェックインを受け付け、AI 介入カードを表示するフローをローカル/Cloud Run で検証できます。システム全体の要件は `docs/system_spec_ja.md` を参照してください。
 
 ## ローカルでの実行方法
 
@@ -14,7 +12,8 @@ AI Studio 上でアプリを確認する: https://ai.studio/apps/drive/1HDEDL9GT
 
 1. 依存関係をインストール  
    `npm install`
-2. Gemini の API キーを `.env.local` の `GEMINI_API_KEY` に設定
+2. （任意）LLM の API キーを `.env.local` の `GEMINI_API_KEY` に設定  
+   ※現在はモック応答を返すため、未設定でも動作します。環境変数は Vite の define でビルド時に注入されます。
 3. 開発サーバーを起動  
    `npm run dev`
 
@@ -49,7 +48,7 @@ AI Studio 上でアプリを確認する: https://ai.studio/apps/drive/1HDEDL9GT
      --region REGION \
      --allow-unauthenticated
    ```
-   数十秒待つと Cloud Run からサービス URL が表示されます。アプリは静的サイトなので、実行時に追加の環境変数を設定する必要はありません。
+   数十秒待つと Cloud Run からサービス URL が表示されます。アプリは静的サイトなので、実行時に追加の環境変数を設定する必要はありません（必要ならビルド時に `.env.local` を反映させます）。
 
 5. **（任意）Docker でローカル確認**
    ```bash
@@ -57,3 +56,7 @@ AI Studio 上でアプリを確認する: https://ai.studio/apps/drive/1HDEDL9GT
    docker run -p 8080:8080 trait-flow-ui
    ```
    http://localhost:8080 にアクセスして、デプロイ前に挙動を確認できます。
+
+## ドキュメント
+- システム仕様: `docs/system_spec_ja.md`
+- メタデータ: `metadata.json`
