@@ -2,7 +2,7 @@
 
 ## 0. 背景
 - 既存の AI Studio UI（React/Vite）をベースに、ユーザーの回答を保存・分析しながら AI からのフィードバックが動的に変化する **プロトタイプ** を短期間で成立させる。
-- 目標は「Big Five × 日次チェックイン × AI 介入」の一連フローを実ユーザーデータで動かし、運用手順と拡張余地を確認すること（SLO の目安はレスポンス ≤5 秒、成功率 ≥97%）。
+- 目標は「Big Five × 日次チェックイン × AI 介入」の一連フローを実ユーザーデータで動かし、運用手順と拡張余地を確認すること。定量 KPI は設定せず、レスポンス体感や安定性をオペレーターが確認する。
 - 基盤には Supabase（Auth + PostgreSQL + Edge Functions）を用い、フロントエンドは Cloud Run 上でホストする。介入生成に利用する LLM API はエンジニアが選定し、Structured Output/Moderation/フォールバックを実装可能なものを採用する。
 
 ## 1. プロトタイプ方針
@@ -23,7 +23,7 @@
 ### スコープ外
  - Symanto / SNS 連携、Push 通知、ネイティブアプリ、A/B テスト、決済系。
 
-## 3. ユーザーフロー（実運用版）
+## 3. ユーザーフロー（プロトタイプ）
 1. **アクセス & 認証**  
    Cloud Run 上の UI へアクセス → Supabase Auth（メールリンク）でログイン。
 2. **TIPI オンボーディング**  
@@ -156,7 +156,7 @@ RLS（Row Level Security）で `user_id = auth.uid()` の行のみ CRUD 可と�
 3. Week3: チェックイン API + intervention_jobs → processIntervention Worker。
 4. Week4: LLM API 連携、エラーハンドリング、Slack 通知。
 5. Week5: QA（iOS/Android）・ロギング・観測性強化・小規模ドッグフーディング。
-6. Week6: パイロットローンチ、週次で KPI/Feedback をレビュー。
+6. Week6: パイロットローンチ、週次で利用者フィードバックをレビュー。
 
 ## 11. リスクと対策
 | リスク | 対策 |
