@@ -150,6 +150,72 @@ RLS（Row Level Security）で `user_id = auth.uid()` の行のみ CRUD 可と�
 2. **オンコール手順**: エラーアラートを受けたら Cloud Logging で `trace_id` を確認 → Supabase の `behavior_events` / `audit_log` を参照 → 必要なら `intervention_jobs` に再投入。手順を runbook として README 末尾にリンク。  
 3. **バージョン管理**: LLM プロンプト、Edge Functions、UI をそれぞれ semantic versioning で管理し、`metadata.json` に `ui_version`, `function_version`, `llm_prompt_version` を記載。ユーザーごとの配信内容がどのバージョンで生成されたかを復元できる。
 
+### 8.4 フローチャート（アーキテクチャ拡張図）
+```mermaid
+flowchart LR
+  subgraph UserFlow[User Journey]
+    U[User] --> UI[Web UI]
+    UI --> Auth[Supabase Auth]
+    Auth --> Edge[Edge Functions]
+    Edge --> DB[(PostgreSQL)]
+    Edge --> Queue[(intervention_jobs)]
+    Queue --> Worker[processIntervention]
+    Worker --> Interventions[(interventions)]
+    Interventions --> Operator[Operator Review]
+    Operator --> Notify[User Notification]
+  end
+
+  subgraph Infra[Production Controls]
+    SM[Secret Manager]
+    Scheduler[Cloud Scheduler]
+    Slack[Slack Alerts]
+    Audit[audit_log]
+  end
+
+  Worker -->|Structured Output| LLMAPI[LLM API]
+  Worker -->|Moderation| Mod[Safety Checks]
+  Worker --> Slack
+  Worker --> Audit
+  Edge --> Audit
+  SM --> Worker
+  Scheduler --> Queue
+  Scheduler --> Worker
+```
+
+### 8.5 シーケンス図（本番時の 1 日の流れ）
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI
+    participant Auth as Supabase Auth
+    participant Edge as Edge Function
+    participant DB as PostgreSQL
+    participant Queue as intervention_jobs
+    participant Worker as processIntervention
+    participant LLM as LLM API
+    participant Mod as Moderation/Safety
+    participant Operator
+    participant Slack
+    participant Audit as audit_log
+
+    User->>UI: TIPI/Check-in入力
+    UI->>Auth: JWT取得
+    UI->>Edge: POST /functions/v1/checkins
+    Edge->>DB: チェックイン保存
+    Edge->>Queue: job enqueue (idempotency_key)
+    Edge->>Audit: リクエスト/レスポンスログ
+    Worker->>Queue: job dequeue
+    Worker->>LLM: Structured Output リクエスト
+    LLM-->>Worker: 応答 or エラー
+    Worker->>Mod: Safety/Moderation 判定
+    Worker->>DB: interventions へ保存
+    Worker->>Slack: エラー通知（必要時）
+    Worker->>Audit: プロンプト/レスポンスログ
+    Operator->>DB: 承認/Reject
+    Operator->>UI: 承認結果
+    UI->>User: AI メッセージ表示
+```
+
 ## 9. 非機能要件
 | 項目 | 要件 |
 | --- | --- |
