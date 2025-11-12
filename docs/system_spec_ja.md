@@ -38,7 +38,7 @@
    メッセージカードを開き評価（1〜5）を送信 → `feedback_score` 更新。
 
 ## 4. システム構成
-mermaid```
+```mermaid` 
 flowchart LR
   subgraph Client[React / Cloud Run]
     Landing --> Auth --> Onboarding --> App
