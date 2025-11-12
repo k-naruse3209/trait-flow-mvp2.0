@@ -113,6 +113,8 @@ flowchart LR
 | `intervention_jobs` | `id`, `user_id`, `checkin_id`, `status`, `attempts`, `payload`, `created_at` |
 | `interventions` | `id`, `user_id`, `checkin_id`, `title`, `body`, `tone`, `feedback_score`, `use_fallback`, `created_at` |
 | `user_settings` | `user_id`, `notification_channel`, `quiet_hours`, `weekly_goal`, `updated_at` |
+| `behavior_events` | `id`, `user_id`, `event_type`, `intervention_id`, `delivery_state`, `rating`, `created_at` |
+| `audit_log` | `id`, `source`, `payload`, `response`, `llm_provider`, `status`, `created_at` |
 
 RLS（Row Level Security）で `user_id = auth.uid()` の行のみ CRUD 可とする。
 
